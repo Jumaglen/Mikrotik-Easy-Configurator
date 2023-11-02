@@ -9,6 +9,7 @@
 
 # You may include more details and comments here as needed.
 
+import ipaddress
 import paramiko
 import getpass
 import time
@@ -46,7 +47,25 @@ def get_valid_input(prompt, validation_func):
         else:
             print("Invalid input. Please try again.")
 
-def configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no, lan_ip, lan_ip_pool, lan_ip_pool_name, wlan_interface_no, lan_subnet, lan_gateway, bridge_name):
+def calculate_network_broadcast(lan_ip, lan_subnet):
+
+    network = ipaddress.IPv4Network(f"{lan_ip}/{lan_subnet}", strict=False)
+   # Get the network address
+    network_address = network.network_address
+
+    # Get the first usable host address (network address + 1)
+    lan_ip = network_address + 10
+
+    # Get the last usable host address (broadcast address - 1)
+    last_usable_host = network.broadcast_address - 10
+
+    pool_range = '{lan_ip}-{last_usable_host}'
+
+    return network_address, pool_range, lan_ip
+
+
+
+def configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no, lan_ip, pool_range, lan_ip_pool_name, wlan_interface_no, lan_subnet, lan_gateway, bridge_name):
     try:
         # Set hostname
         print("Setting Hostname.")
@@ -59,7 +78,7 @@ def configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no,
         print("Setting WAN route")
         ssh.exec_command(f'/ip route add gateway={wan_gateway}')
         time.sleep(2)
-        ssh.exec_command(f'/ip pool add name={lan_ip_pool_name} ranges={lan_ip_pool}') 
+        ssh.exec_command(f'/ip pool add name={lan_ip_pool_name} ranges={pool_range}') 
         # Create a bridge and add LAN interfaces
         time.sleep(2)
         print("Setting Bridge Interface")
@@ -178,26 +197,24 @@ def main():
     wan_ip = get_valid_input("Enter the WAN IP address: ", validate_ipv4)
     wan_subnet = input("Enter the WAN subnet mask: ")
     wan_gateway = get_valid_input("Enter the WAN Gateway IP address: ", validate_ipv4)    
-    lan_ip =  get_valid_input("Enter the LAN IP address: ", validate_ipv4)
     lan_subnet =  input("Enter the LAN subnet mask: ")
     lan_gateway = '192.168.100.1'
-    lan_ip_pool = '192.168.100.2-192.168.100.254'
     lan_ip_pool_name = get_valid_input("Enter the LAN Gateway: ", validate_ipv4)
     lan_interface_no = int(input("Enter the Number of lan ports on the Mikrorik router: "))
     new_lan_no = lan_interface_no + 1    
     bridge_name = input("Enter the bridge name: ")
-    dhcp_pool_name = "dPool"
-    lan_address = '192.168.100.0'   
+    dhcp_pool_name = "dPool"  
     wlan_interface_no = input("Enter 2 for dual band router or 1 for single band")
+    lan_address, pool_range, lan_ip = calculate_network_broadcast(lan_ip, lan_subnet)
     wifi_name = input("Enter the 2.4Ghz Wi-Fi SSID: ")
     wifi_password = getpass.getpass("Enter the 2.4Ghz Wi-Fi password: ")
     
     ssh = establish_ssh_connection(router_ip, username, password)
     
     if ssh:
-        configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no, lan_ip, lan_ip_pool, lan_ip_pool_name, wlan_interface_no, lan_subnet, lan_gateway, bridge_name)
+        configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no, lan_ip, pool_range, lan_ip_pool_name, wlan_interface_no, lan_subnet, lan_gateway, bridge_name)
         configure_firewall(ssh)
-        #configure_wifi(ssh, wifi_name, wlan_interface_no, wifi_password)
+        configure_wifi(ssh, wifi_name, wlan_interface_no, wifi_password)
         configure_dhcp_server(ssh, dhcp_pool_name, bridge_name, lan_ip_pool_name, lan_gateway, lan_address, lan_subnet)
         ssh.close()
 
