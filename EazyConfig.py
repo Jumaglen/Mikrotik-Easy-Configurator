@@ -7,8 +7,6 @@
 # This code is released under the MIT License.
 # See the LICENSE file or the "LICENSE" section in the project repository for details.
 
-# You may include more details and comments here as needed.
-
 import ipaddress
 import paramiko
 import getpass
@@ -203,11 +201,11 @@ def main():
     lan_interface_no = int(input("Enter the Number of lan ports on the Mikrorik router: "))
     new_lan_no = lan_interface_no + 1    
     bridge_name = input("Enter the bridge name: ")
-    dhcp_pool_name = "dPool"  
+    dhcp_pool_name = "dPool"
+    lan_address = '192.168.100.0'   
     wlan_interface_no = input("Enter 2 for dual band router or 1 for single band")
-    lan_address, pool_range, lan_ip = calculate_network_broadcast(lan_ip, lan_subnet)
     wifi_name = input("Enter the 2.4Ghz Wi-Fi SSID: ")
-    wifi_password = getpass.getpass("Enter the 2.4Ghz Wi-Fi password: ")
+    wifi_password = input("Enter the 2.4Ghz Wi-Fi password: ")
     
     ssh = establish_ssh_connection(router_ip, username, password)
     
