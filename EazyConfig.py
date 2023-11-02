@@ -7,8 +7,6 @@
 # This code is released under the MIT License.
 # See the LICENSE file or the "LICENSE" section in the project repository for details.
 
-# You may include more details and comments here as needed.
-
 import paramiko
 import getpass
 import time
@@ -186,18 +184,18 @@ def main():
     lan_interface_no = int(input("Enter the Number of lan ports on the Mikrorik router: "))
     new_lan_no = lan_interface_no + 1    
     bridge_name = input("Enter the bridge name: ")
-    dhcp_pool_name = "dPool"
-    lan_address = '192.168.100.0'   
-    wlan_interface_no = input("Enter 2 for dual band router or 1 for single band")
+    dhcp_pool_name = "deafultPool"
+    lan_address = get_valid_input("Enter the LAN Network address: ", validate_ipv4)   
+    wlan_interface_no = int(input("Enter 2 for dual band router or 1 for single band"))
     wifi_name = input("Enter the 2.4Ghz Wi-Fi SSID: ")
-    wifi_password = getpass.getpass("Enter the 2.4Ghz Wi-Fi password: ")
+    wifi_password = input("Enter the 2.4Ghz Wi-Fi password: ")
     
     ssh = establish_ssh_connection(router_ip, username, password)
     
     if ssh:
         configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no, lan_ip, lan_ip_pool, lan_ip_pool_name, wlan_interface_no, lan_subnet, lan_gateway, bridge_name)
         configure_firewall(ssh)
-        #configure_wifi(ssh, wifi_name, wlan_interface_no, wifi_password)
+        configure_wifi(ssh, wifi_name, wlan_interface_no, wifi_password)
         configure_dhcp_server(ssh, dhcp_pool_name, bridge_name, lan_ip_pool_name, lan_gateway, lan_address, lan_subnet)
         ssh.close()
 
