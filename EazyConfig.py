@@ -45,27 +45,30 @@ def get_valid_input(prompt, validation_func):
         else:
             print("Invalid input. Please try again.")
 
+#function to calculate network address and ip pool range
 def calculate_network_broadcast(lan_ip, lan_subnet):
 
     network = ipaddress.IPv4Network(f"{lan_ip}/{lan_subnet}", strict=False)
    # Get the network address
-    network_address = network.network_address
+    lan_address = network.network_address
 
     # Get the first usable host address (network address + 1)
-    lan_ip = network_address + 10
+    lan_first_ip = lan_address + 10
+
+    lan_gateway = lan_address + 1
 
     # Get the last usable host address (broadcast address - 1)
     last_usable_host = network.broadcast_address - 10
 
-    pool_range = '{lan_ip}-{last_usable_host}'
+    pool_range = {lan_first_ip}-{last_usable_host}
 
-    return network_address, pool_range, lan_ip
+    return lan_address, pool_range, lan_gateway
 
 
 
-def configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no, lan_ip, pool_range, lan_ip_pool_name, wlan_interface_no, lan_subnet, lan_gateway, bridge_name):
+def configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no, lan_ip, pool_range, lan_ip_pool_name, wlan_interface_no, lan_subnet, bridge_name):
     try:
-        # Set hostname
+        #Set hostname
         print("Setting Hostname.")
         ssh.exec_command(f'/system identity set name={hostname}')
         time.sleep(2)
@@ -76,6 +79,7 @@ def configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no,
         print("Setting WAN route")
         ssh.exec_command(f'/ip route add gateway={wan_gateway}')
         time.sleep(2)
+        print("Setting LAN IP Pool")
         ssh.exec_command(f'/ip pool add name={lan_ip_pool_name} ranges={pool_range}') 
         # Create a bridge and add LAN interfaces
         time.sleep(2)
@@ -110,9 +114,6 @@ def configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no,
                     time.sleep(2)
                 except Exception as e:
                     print(f"Failed to add interface wlan1 to bridge: {str(e)}")
-        # Set LAN gateway
-        print("Setting LAN route")
-        ssh.exec_command(f'/ip route add gateway={lan_gateway}')
         time.sleep(2)
         print("Router configuration completed.")
     except Exception as e:
@@ -137,7 +138,9 @@ def configure_firewall(ssh):
         ssh.exec_command('/ip firewall filter add chain=input in-interface=ether1 action=drop comment="block everything else')
         time.sleep(2)
         ssh.exec_command('/ip service disable telnet,ftp,api')
+        time.sleep(2)
         ssh.exec_command('/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade')
+        time.sleep(2)
         print("Firewall configuration completed.")
     
     except Exception as e:
@@ -160,7 +163,7 @@ def configure_wifi(ssh, wifi_name, wlan_interface_no, wifi_password):
             time.sleep(2)
 
             wifi_5_name = input("Enter the 5GHz Wi-Fi SSID: ")
-            wifi_5_password = getpass.getpass("Enter the 5GHz Wi-Fi password: ")
+            wifi_5_password = input("Enter the 5GHz Wi-Fi password: ")
             ssh.exec_command(f'/interface wireless set wlan2 band=5ghz-a/n/ac channel-width=20/40/80mhz-XXXX distance=indoors mode=ap-bridge ssid={wifi_5_name} wireless-protocol=802.11 security-profile={wifi_5_name} frequency-mode=regulatory-domain country=kenya')
             time.sleep(2)
             ssh.exec_command(f'/interface wireless security-profiles add name={wifi_5_name} authentication-types=wpa2-psk mode=dynamic-keys wpa2-pre-shared-key={wifi_5_password}')
@@ -186,31 +189,52 @@ def configure_dhcp_server(ssh, dhcp_pool_name, bridge_name, lan_ip_pool_name, la
         print(f"Failed to configure DHCP server: {str(e)}")
             
 def main():
-    #User inputs for the required variables that details
-    #IP Address of the  
+    #User defined values
+
+
+
+    #SSH log in inputs
     router_ip = get_valid_input("Enter router ip address: ", validate_ipv4)
+
     username = input("Enter the SSH username: ")
-    password = getpass.getpass("Enter the SSH password: ")     
-    hostname = input("Enter the hostname of the MikroTik device: ")    
+
+    password = getpass.getpass("Enter the SSH password: ")   
+
+    #Router Settings
+    hostname = input("Enter the hostname of the MikroTik device: ") 
+
     wan_ip = get_valid_input("Enter the WAN IP address: ", validate_ipv4)
-    wan_subnet = input("Enter the WAN subnet mask: ")
-    wan_gateway = get_valid_input("Enter the WAN Gateway IP address: ", validate_ipv4)    
-    lan_subnet =  input("Enter the LAN subnet mask: ")
-    lan_gateway = '192.168.100.1'
-    lan_ip_pool_name = get_valid_input("Enter the LAN Gateway: ", validate_ipv4)
+
+    wan_subnet = int(input("Enter the WAN subnet mask: e.g 24 "))
+
+    wan_gateway = get_valid_input("Enter the WAN Gateway IP address: ", validate_ipv4) 
+
+    lan_ip = get_valid_input("Enter the LAN IP address: ", validate_ipv4)
+
+    lan_subnet =  int(input("Enter the LAN subnet mask: e.g 24 "))
+
+    lan_ip_pool_name = ("defaultPool")
+
     lan_interface_no = int(input("Enter the Number of lan ports on the Mikrorik router: "))
-    new_lan_no = lan_interface_no + 1    
-    bridge_name = input("Enter the bridge name: ")
-    dhcp_pool_name = "dPool"
-    lan_address = '192.168.100.0'   
+
+    new_lan_no = lan_interface_no + 1
+
+    lan_address, pool_range, lan_gateway = calculate_network_broadcast(lan_ip,lan_subnet) 
+
+    bridge_name = "defaultBridge"
+
+    dhcp_pool_name = "defaultPool"   
+
     wlan_interface_no = input("Enter 2 for dual band router or 1 for single band")
+
     wifi_name = input("Enter the 2.4Ghz Wi-Fi SSID: ")
+
     wifi_password = input("Enter the 2.4Ghz Wi-Fi password: ")
     
     ssh = establish_ssh_connection(router_ip, username, password)
     
     if ssh:
-        configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no, lan_ip, pool_range, lan_ip_pool_name, wlan_interface_no, lan_subnet, lan_gateway, bridge_name)
+        configure_router(ssh, hostname, wan_ip, wan_subnet, wan_gateway, new_lan_no, lan_ip, pool_range, lan_ip_pool_name, wlan_interface_no, lan_subnet, bridge_name)
         configure_firewall(ssh)
         configure_wifi(ssh, wifi_name, wlan_interface_no, wifi_password)
         configure_dhcp_server(ssh, dhcp_pool_name, bridge_name, lan_ip_pool_name, lan_gateway, lan_address, lan_subnet)
