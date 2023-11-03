@@ -1,11 +1,11 @@
 # Author: Glen Juma
 # Date: 2023-11-02
 
-# Description: This code.
+# Description: This python code uses a collection of user #inputs variables such as ip addresses and will automatically #interact with the router via ssh to set up the router.
 
 # License:
 # This code is released under the MIT License.
-# See the LICENSE file or the "LICENSE" section in the project repository for details.
+# See the LICENSE file or the "LICENSE" section in the project #repository for details.
 
 import ipaddress
 import paramiko
